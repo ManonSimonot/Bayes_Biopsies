@@ -5,18 +5,43 @@ editor: visual
 ---
 
 ```{r}
+library(coda) #pour fonction MCMC
+```
+
+Pour un hôpital $i$, on a :
+
+-   $n_i$ : nombre d'opérations
+
+-   $p_i$ : la proba de mourir
+
+-   $r_i$ : le nombre de morts
+
+$r_i | p_i \sim B(p_i,n_i)$
+
+$p_i \sim Beta(1,1)$
+
+Après calcul de la loi à posteriori :
+
+$\pi(p_i, r_i) \propto Beta(1+r_i, 1+n_i - r_i)$
+
+On implémente un algorithme Gibbs :
+
+```{r}
 gibbs1 = function(nchain){
-  n = c(47, 148, 119, 810,   211, 196, 148, 215, 207, 97, 256, 360)
-  r = c(0, 18, 8, 46, 8, 13, 9,   31, 14, 8, 29, 24)
-  N = 12 #nombre d'hopitaux
+  #nombres d'opération
+  n_ops = c(47, 148, 119, 810,   211, 196, 148, 215, 207, 97, 256, 360)
+  #nombre de morts par hopital
+  n_death = c(0, 18, 8, 46, 8, 13, 9,   31, 14, 8, 29, 24)
+  #nombre d'hopitaux
+  N_hospitals = 12 
   
-  chain = matrix(0.5, nchain + 1, N) #p1, ..., p12
+  chain = matrix(0.5, nchain + 1, N_hospitals) #p1, ..., p12
   
   for (i in 1:nchain){
     pi = chain[i,]
     #pour chaque hopital (N)
-    for (j in 1:N){
-      pi[j] = rbeta(1, r[j]+1, n[j] - r[j] +1)
+    for (j in 1:N_hospitals){
+      pi[j] = rbeta(1, n_death[j]+1, n_ops[j] - n_death[j] +1)
     }
     #store new states
     chain[i+1,] = pi 
@@ -34,6 +59,10 @@ plot(mcmc(chain))
 ```
 
 ```{r}
-apply(chain, 2, mean)
-apply(chain, 2, sd)
+res = data.frame(
+  mean = round(apply(chain, 2, mean), 4),
+  sd = round(apply(chain, 2, sd), 4)
+)
+rownames(res) = paste("p[", 1:12,"]")
+print(res)
 ```
