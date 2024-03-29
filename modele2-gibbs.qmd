@@ -1,0 +1,155 @@
+---
+title: "Projet Surgical - Modèle 2 : Gibbs sampling"
+format: html
+editor: visual
+---
+
+```{r}
+library(coda) #pour fonction mcmc
+```
+
+Pour un hôpital $i$, on a :
+
+-   $n_i$ : nombre d'opérations
+
+-   $p_i$ : la proba de mourir
+
+-   $r_i$ : le nombre de morts
+
+$r_i | p_i \sim B(p_i,n_i)$
+
+$b_i \sim N(\mu, \tau^{-1})$
+
+$\mu \sim (0, \sigma_\mu)$
+
+$\tau \sim G(\alpha, \beta)$
+
+Après calculs des lois conditionnelles, on a :
+
+$f(\tau|...) \sim G(\alpha +\frac{N}{2}, \beta + \frac{1}{2}\sum (b_i - \mu)^2)$
+
+$\displaystyle f(\mu|...) \sim N \left( \frac{\sigma_\mu^2 \sum b_i}{\tau^{-1}+\sigma_\mu^2}, \frac{\sigma_\mu^2 \tau^{-1}}{\tau^{-1}+\sigma_\mu^2} \right)$
+
+$\displaystyle f(b_i|...) \propto \frac{1}{(1+e^{b_i})^{n_i}} e^{-\frac{1}{2 \tau^{-1}} \left(b_i - (\mu + \tau^{-1} r_i) \right)^2}$
+
+$\Longrightarrow L(b_i|...) \propto -n_i log(1+e^{b_i}) - \frac{1}{2 \tau^{-1}} \left(b_i - (\mu + \tau^{-1} r_i) \right)^2$
+
+Données :
+
+```{r}
+#nombres d'opération
+n_ops = c(47, 148, 119, 810, 211, 196, 148, 215, 207, 97, 256, 360)
+#nombre de morts par hopital
+n_death = c(0, 18, 8, 46, 8, 13, 9, 31, 14, 8, 29, 24)
+#nombre d'hopitaux
+N_hospitals = 12 
+```
+
+Densité conditionnelle de $b_i$ :
+
+```{r}
+logf_bi = function(bi, ni, ri, tau, mu) {
+  sum1 = -ni*log(1+exp(bi))
+  sum2 = -(tau/2)*(bi - (mu+ri/tau))^2
+  return(sum1+sum2)
+}
+```
+
+Comme pour les $b_i$ on a que la densité et on ne connait pas la loi, on doit faire un Metropolis-Hastings dans un Gibbs :
+
+```{r}
+#alpha et beta : param de la loi gamma de tau
+#sigma_mu : param de la loi normale de mu
+#prop_sd : ecart-type pour la perturbation dans la proposition
+gibbs2 = function(nchain, n_ops, n_death, N_hospitals, alpha, beta, sigma_mu, prop_sd){
+
+  #b1,...,b12 ; mu ; tau 
+  chain = matrix(NA, nchain + 1, N_hospitals+2) 
+  colnames(chain) = c(paste("b",1:12), "mu", "tau")
+
+  #initialisation
+  chain[1,] = c(rep(0.1,12), 0, 1)
+  
+  for (i in 1:nchain){
+    b = chain[i,1:12]
+    mu = chain[i,"mu"]
+    tau = chain[i,"tau"]
+    
+    #mise à jour de tau
+    alpha_cond = alpha + N_hospitals/2
+    beta_cond = beta + sum((b-mu)^2)/2
+    tau = rgamma(1, shape=alpha_cond, rate=beta_cond)
+    
+    #mise à jour de mu
+    mean_cond = (sigma_mu*sum(b))/(1/tau + sigma_mu*N_hospitals)
+    var_cond = (sigma_mu*(1/tau))/(1/tau + sigma_mu*N_hospitals)
+    mu = rnorm(1, mean=mean_cond, sd=sqrt(var_cond))
+    
+    #mise à jour des bi : Metropolis-Hastings 
+    for (j in 1:N_hospitals){
+      
+      #proposition
+      prop = rnorm(1, mean=chain[i,j], sd=prop_sd[j]) 
+      
+      #calcul de la probabilité d'acceptation (noyau symétrique)
+      top = logf_bi(prop, n_ops[j], n_death[j], tau, mu)
+      bottom = logf_bi(chain[i,j], n_ops[j], n_death[j], tau, mu)
+      acc_prob = exp(top - bottom)
+      
+      if (runif(1) < acc_prob) {
+            b[j] = prop
+      }
+    }
+    
+    #mettre à jour la chaine
+    chain[i+1,] = c(b, mu, tau)
+  }
+  return(chain)
+}
+```
+
+```{r}
+nchain= 11000 
+alpha = 0.001
+beta = 0.001
+sigma_mu = 10^12
+prop_sd = rep(0.5,12)
+
+chain = gibbs2(nchain, n_ops, n_death, N_hospitals, alpha, beta, sigma_mu, prop_sd)
+```
+
+```{r}
+#burn in period
+chain = chain[1001:11000,]
+
+par(mar = c(4, 5, 0.5, 0.5))
+plot(mcmc(chain))
+```
+
+Ensuite on retrouve les paramètres $\mu$, $p_i$, $pop.mean$ et $\sigma$ :
+
+$p_i = \displaystyle \frac{e^{b_i}}{1+ e^{b_i}}$
+
+$pop.mean = \displaystyle \frac{e^{\mu}}{1+ e^{\mu}}$
+
+$\sigma = \displaystyle \frac{1}{\sqrt{\tau}}$
+
+```{r}
+b = chain[,1:12]
+p = exp(b)/(1+exp(b))
+
+mu = chain[,"mu"]
+pop.mean = exp(mu)/(1+exp(mu))
+
+tau = chain[,"tau"]
+sigma = 1/sqrt(tau)
+
+params = cbind(mu, p, pop.mean, sigma)
+
+res = data.frame(
+  mean = round(apply(params, 2, mean), 4),
+  sd = round(apply(params, 2, sd), 4)
+)
+rownames(res) = c("mu", paste("p[", 1:12,"]", sep=""), "pop.mean", "sigma")
+print(res, max=NULL)
+```
