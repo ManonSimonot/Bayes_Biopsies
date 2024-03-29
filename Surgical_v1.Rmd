@@ -1,0 +1,90 @@
+---
+title: "Project: Surgical"
+author: "Aëla Jagot"
+date: "15 avril 2024"
+output: 
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+---
+
+This project considers mortality rates in 12 hospitals performing cardiac surgery in babies. The data are shown below:
+
+```{r}
+N <- 12                                              # Number of hospitals
+n <- c(47, 148, 119, 810, 211, 196, 148, 215, 207,   # Number of cardiac surgery
+       97, 256, 360)
+r <- c(0, 18, 8, 46, 8, 13, 9, 31, 14, 8, 29, 24)    # Number of death
+```
+
+The number of deaths $r_i$ for hospital $i$ are modelled as a binary response variable with 'true' failure probability $p_i$:
+$$r_i \, | \, p_i \sim Bin(p_i,n_i)$$
+We first assume that the true failure probabilities are independent (i.e.fixed effects) for each hospital. \\ 
+This is equivalent to assuming a standard non-informative prior distribution for the $p_i$'s, namely:
+$$p_i \sim Beta(1,1)$$
+The density of the prior distibution of $p_i$ equals:
+$$\pi(p_i) = p_i^0 \, (1-p_i)^0 = 1$$
+We calculate the posterior distribution for $p_i$:
+$$\pi(p_i|r_i) \propto \pi(p_i) \, \pi(r_i|p_i) \propto p_i^{r_i}(1-p_i)^{n_i-p_i}$$
+We recognize a Beta distribution. We obtain that:
+$$p_i \sim Beta(r_i+1,n_i-r_i+1)$$
+For fixed effects, we implements a first model (Gibbs):
+```{r}
+model_1 <- function(N, n, r, nchain){
+  ## Initialisation
+  chain <- matrix(NA, nchain + 1, N)
+  colnames(chain) <- c("p_A", "p_B", "p_C", "p_D", "p_E", "p_F", "p_G", "p_H",
+                       "p_I", "p_J", "p_K", "p_L")      # p for the N hospitals
+  ## Prior distribution for p
+  chain[1,] <- rbeta(N, shape1=1, shape2=1)
+  for(k in 1:nchain){
+    p <- rep(NA, N)
+    for(i in 1:N){
+      p[i] <- rbeta(1, shape1=r[i]+1, shape2=n[i]-r[i]+1)
+    }
+    chain[k+1,] <- p
+  }
+  return(chain)
+}
+```
+
+```{r}
+chain_1 <- model_1(N, n, r, nchain=50000)
+```
+
+```{r}
+library(coda)
+plot(mcmc(chain_1))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+These are the initialisation states for the second model:
+
+```{r}
+b <- c(0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1)
+sigmasq <- 1
+mu <- 0
+```
+
+
+
+
+
+
+
+
+
+
+
