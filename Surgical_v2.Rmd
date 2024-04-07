@@ -1,0 +1,154 @@
+---
+title: "Project: Surgical"
+author: "Aëla Jagot"
+date: "15 avril 2024"
+output: 
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+---
+
+This project considers mortality rates in 12 hospitals performing cardiac surgery in babies. The data are shown below:
+
+```{r}
+N <- 12                                              # Number of hospitals
+n <- c(47, 148, 119, 810, 211, 196, 148, 215, 207,   # Number of cardiac surgery
+       97, 256, 360)
+r <- c(0, 18, 8, 46, 8, 13, 9, 31, 14, 8, 29, 24)    # Number of death
+```
+
+The number of deaths $r_i$ for hospital $i$ are modelled as a binary response variable with 'true' failure probability $p_i$:
+$$r_i \, | \, p_i \sim Bin(p_i,n_i)$$
+We first assume that the true failure probabilities are independent (i.e.fixed effects) for each hospital. \\ 
+This is equivalent to assuming a standard non-informative prior distribution for the $p_i$'s, namely:
+$$p_i \sim Beta(1,1)$$
+The density of the prior distibution of $p_i$ equals:
+$$\pi(p_i) = p_i^0 \, (1-p_i)^0 = 1$$
+We calculate the posterior distribution for $p_i$:
+$$\pi(p_i|r_i) \propto \pi(p_i) \, \pi(r_i|p_i) \propto p_i^{r_i}(1-p_i)^{n_i-p_i}$$
+We recognize a Beta distribution. We obtain that:
+$$p_i \sim Beta(r_i+1,n_i-r_i+1)$$
+For fixed effects, we implement a first model (Gibbs):
+```{r}
+# N, n, r are settings from the data
+
+model_1 <- function(N, n, r, nchain){
+  ## Initialization
+  chain <- matrix(NA, nchain+1, N)
+  colnames(chain) <- c("p_A", "p_B", "p_C", "p_D", "p_E", "p_F", "p_G", "p_H",
+                       "p_I", "p_J", "p_K", "p_L")      # p for the N hospitals
+  ## Prior distribution for p
+  chain[1,] <- rbeta(N, shape1=1, shape2=1)
+  for(k in 1:nchain){
+    p <- rep(NA, N)
+    for(i in 1:N){
+      p[i] <- rbeta(1, shape1=r[i]+1, shape2=n[i]-r[i]+1)
+    }
+    chain[k+1,] <- p
+  }
+  return(chain)
+}
+```
+
+```{r}
+chain_1 <- model_1(N, n, r, nchain=50000)
+```
+
+```{r}
+library(coda)
+plot(mcmc(chain_1))
+```
+
+```{r} 
+### Results added by Margot
+chain_1 <- chain_1[1001:11001,]
+res = data.frame(
+  mean = round(apply(chain_1, 2, mean), 4),
+  sd = round(apply(chain_1, 2, sd), 4)
+)
+print(res)
+```
+
+A more realistic model for the surgical data is to assume that the failure rates across hospitals are similar in some way. This is equivalent to specifying a random effects model for the true failure probabilities pi as follows:
+$$\text{logit} (p_i) = b_i$$
+
+$$b_i \sim Normal(\mu, \tau)$$
+We remember that $\text{logit} (p_i) = \log(\frac{p_i}{1-p_i}) = b_i \Leftrightarrow p_i = \frac{e^{b_i}}{1-e^{b_i}}$.
+
+Standard non-informative priors are then specified for the population mean (logit) probability of failure, $\mu$, and precision, $\tau$. 
+We carry out the calculations necessary for building the model. We remember that $N$ = 12.
+
+$\underline{For \; \mu}:$
+
+We have a non-informative prior distribution for $\mu$ :
+$$\mu \sim \text{Normal}(0,\sigma_\mu^2) \quad \text{with} \; \sigma_{\mu} \; \text{known}.$$
+We know that $\tau = \frac{1}{\sigma^2}$.
+$$\pi(\mu|\cdots) \propto \pi(\mu) \prod_{i=1}^{12}\pi(b_i|\mu,\tau) \propto e^{\frac{-\mu^2}{2\sigma_\mu^2}} \prod_{i=1}^{12}e^{\frac{-\tau(b_i-\mu)^2}{2}} \propto e^{\frac{-1}{2 \sigma_\mu^2}(\mu^2(1+12\tau\sigma_\mu^2) - 2\mu\tau\sigma_\mu^2\sum_{i=1}^{12}b_i)} \\ \propto e^{\frac{-1}{2}(\frac{\sigma_\mu^2}{1+12\tau\sigma_\mu^2})^{-1}(\mu - 2 \mu \frac{\tau \sigma_\mu^2 \sum_{i=1}^{12}b_i}{1+12\tau\sigma_\mu^2})}$$
+We recognize a Normal distribution. We obtain that:
+$$\mu \sim Normal(\frac{\sigma_\mu^2}{1+12\tau\sigma_\mu^2}, \frac{\tau \sigma_\mu^2 \sum_{i=1}^{12}b_i}{1+12\tau\sigma_\mu^2})$$
+
+$\underline{For \; \tau}:$
+
+We have a non-informative prior distribution for $\tau$ :
+$$\mu \sim \text{Gamma}(\alpha,\beta) \quad \text{with} \; \alpha \; and \; \beta \; \text{known}.$$
+$$\pi(\tau|\cdots) \propto \pi(\tau) \prod_{i=1}^{12} \pi(b_i|\mu,\tau) \propto \tau^{\alpha-1}e^{-\beta \tau}\prod_{i=1}^{12}\sqrt{\tau}e^{\frac{-1}{2}\tau(b_i-\mu)^2} \propto \tau^{\alpha+\frac{12}{2}-1} e^{-\tau(\beta+\frac{1}{2}\sum_{i=1}^{12}(b_i-\mu)^2)}$$
+We recognize a Gamma distribution. We obtain that:
+$$\tau \sim Gamma(\alpha+\frac{12}{2}, \beta+\frac{1}{2}\sum_{i=1}^{12}(b_i-\mu)^2)$$
+$\underline{For \; b_i}:$
+
+We remember that $\text{logit} (p_i) = \log(\frac{p_i}{1-p_i}) = b_i \Leftrightarrow p_i = \frac{e^{b_i}}{1-e^{b_i}}$.
+$$\pi(b_i|\cdots) \propto \pi(b_i|\mu,\tau) \pi(r_i|b_i) \propto e^{\frac{-\tau}{2}(b_i-\mu)^2} (\frac{e^{b_i}}{1+e^{b_i}})^{r_i} (1 - \frac{e^{b_i}}{1+e^{b_i}})^{n_i - r_i} \propto \frac{e^{\frac{-\tau}{2}(b_i-\mu)^2}e^{b_ir_i}}{(1+e^{b_i})^{n_i}} \\ \propto \frac{e^{\frac{-\tau b_i^2}{2}-\tau\mu b_i + b_ir_i}}{(1+e^{b_i})^{n_i}} \propto \frac{e^{b_i(r_i-\tau(\mu+\frac{b_i}{2}))}}{(1+e^{b_i})^{n_i}}$$
+We don't recognize the distribution. It is possible to do a Metropolis-Hastings algorithm. We switch to logarithm.
+$$\log(\pi(b_i|\cdots)) \propto b_i(r_i-\tau(\mu+\frac{b_i}{2}) - n_i\log(1+e^{b_i})$$
+
+These are the initialization states for the second model (Gibbs):
+
+```{r}
+b <- c(0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1)
+sigmasq <- 1
+mu <- 0
+```
+
+For random effects, we implement a second model (NOT FINISHED):
+
+```{r}
+# N, n, r are settings from the data
+# b, sigmasq, mu are settings for the initialization
+
+model_2 <- function(N, n, r, b, sigmasq, mu, nchain){
+  ## Hyperparameters
+  mu.sigma2 <- .000001
+  tau.alpha <- .001
+  tau.beta <- .001
+  ## Initialization
+  tau <- 1/sigmasq^2
+  chain <- matrix(NA, nchain+1, N+3)
+  colnames(chain) <- c("p_A", "p_B", "p_C", "p_D", "p_E", "p_F", "p_G", "p_H",
+                       "p_I", "p_J", "p_K", "p_L", "mu", "sigma", "pop.mean")       # p for the N hospitals
+  ## Prior distribution for p and others settings
+  chain[1, 1:N] <- rbeta(N, shape1=1, shape2=1)
+  chain[1, N+1] <- mu
+  chain[1, N+2] <- tau
+  chain[1, N+3] <- exp(mu)/(1+exp(mu))
+  for(k in 1:nchain){
+    b <- rep(NA, N)
+    mu.mean <- mu.sigma2 / (1+N*tau*mu.sigma2)
+    mu.var <- tau*mu.sigma2*sum(b) / (1+N*tau*mu.sigma2)
+    mu <- rnorm(n=1, mean=mu.mean, sd=sqrt(mu.var))
+    tau.shape <- tau.alpha + N/2
+    tau.rate <- tau.beta + .5*sum((b-mu)**2)
+    tau <- rgamma(n=1, shape=tau.shape, rate=tau.rate)
+    sigma.update <- 1/sqrt(tau)
+    #for(i in 1:N){
+    #  b[i] <- ???                              # Metropolis-Hastings algorithm
+    #}
+    p <- exp(p)/(1 + exp(b))                    # inverse of the logit function
+    chain[k+1, 1:N] <- p
+    chain[1, N+1] <- mu
+    chain[1, N+2] <- sigma
+    chain[1, N+3] <- exp(mu)/(1+exp(mu))
+  }
+  return(chain)
+}
+```
+
