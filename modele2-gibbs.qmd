@@ -62,7 +62,7 @@ La probabilité de défaillance d'un hôpital est définie comme la probabilité
 On calcule ce rang à l'aide de la fonction suivante :
 
 ```{r}
-rank_proba = function(b, tau, mu){
+rank_proba = function(b, mu, tau){
   
   #proba de défaillance
   prob_failure = pnorm(b, mu, sqrt(1/tau))
@@ -125,7 +125,7 @@ gibbs2 = function(nchain, n_ops, n_death, N_hospitals, alpha, beta, sigma_mu, pr
     }
     
     #calcul des rangs de défaillance
-    ranks = rank_proba(b, tau, mu)
+    ranks = rank_proba(b, mu, tau)
     
     #mettre à jour la chaine
     chain[i+1,] = c(b, mu, tau)
@@ -143,7 +143,9 @@ beta = 0.001
 sigma_mu = 10^12
 prop_sd = rep(0.5,12)
 
-chain = gibbs2(nchain, n_ops, n_death, N_hospitals, alpha, beta, sigma_mu, prop_sd)$chain
+res_gibbs = gibbs2(nchain, n_ops, n_death, N_hospitals, alpha, beta, sigma_mu, prop_sd)
+
+chain = res_gibbs$chain
 ```
 
 ```{r}
@@ -185,7 +187,7 @@ print(res, max=NULL)
 On peut afficher la distribution des rangs pour le taux de mortalité estimé dans chaque hôpital :
 
 ```{r}
-failure = gibbs2(nchain, n_ops, n_death, N_hospitals, alpha, beta, sigma_mu, prop_sd)$failure_rank
+failure = res_gibbs$failure_rank
 
 #burn in period
 failure = failure[1001:11000,]
@@ -193,6 +195,8 @@ failure = failure[1001:11000,]
 
 ```{r}
 for (i in 1:12) {
-  hist(failure[,i], freq = FALSE, main = paste("p[", i, "]"), xlab = "rang", breaks = 12)
+  hist(failure[,i],  breaks = seq(0.5, 12.5, by = 1), freq=FALSE,
+       main = paste0("p[", i, "]"), xlab = "rang", ylab="",
+       col="red", border="white")
 }
 ```
