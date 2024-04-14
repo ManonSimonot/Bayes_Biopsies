@@ -85,7 +85,7 @@ gibbs2 = function(nchain, n_ops, n_death, N_hospitals, alpha, beta, sigma_mu, pr
 
   #b1,...,b12 ; mu ; tau 
   chain = matrix(NA, nchain + 1, N_hospitals+2) 
-  colnames(chain) = c(paste("b",1:12), "mu", "tau")
+  colnames(chain) = c(paste0("b",1:12), "mu", "tau")
   
   #rang de défaillance
   failure_rank = matrix(0, nchain + 1, N_hospitals)
@@ -154,6 +154,14 @@ chain = chain[1001:11000,]
 
 par(mar = c(4, 5, 0.5, 0.5))
 plot(mcmc(chain))
+```
+
+```{r}
+plot(chain[,"b2"], type='l', xlab="", ylab="", col="blue")
+```
+
+```{r}
+acf(chain[,"b2"], main="")
 ```
 
 Ensuite on retrouve les paramètres $\mu$, $p_i$, $pop.mean$ et $\sigma$ :

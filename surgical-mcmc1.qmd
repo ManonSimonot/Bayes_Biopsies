@@ -36,6 +36,7 @@ gibbs1 = function(nchain){
   N_hospitals = 12 
   
   chain = matrix(0.5, nchain + 1, N_hospitals) #p1, ..., p12
+  colnames(chain) = c(paste0("p",1:12))
   
   for (i in 1:nchain){
     pi = chain[i,]
@@ -56,6 +57,14 @@ chain = gibbs1(11000)
 #brunin
 chain = chain[1001:11001,]
 plot(mcmc(chain))
+```
+
+```{r}
+plot(chain[,2], xlab="", ylab="", col="blue", type="l")
+```
+
+```{r}
+acf(chain[,2], main="")
 ```
 
 ```{r}
