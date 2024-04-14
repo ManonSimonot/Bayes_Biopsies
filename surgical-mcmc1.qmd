@@ -5,12 +5,12 @@ editor: visual
 ---
 
 ```{r}
-library(coda) #pour fonction MCMC
+library(coda) #pour fonction mcmc
 ```
 
 Pour un hôpital $i$, on a :
 
--   $n_i$ : nombre d'opérations
+-   $n_i$ : le nombre d'opérations
 
 -   $p_i$ : la proba de mourir
 
@@ -24,7 +24,7 @@ Après calcul de la loi à posteriori :
 
 $\pi(p_i, r_i) \propto Beta(1+r_i, 1+n_i - r_i)$
 
-On implémente un algorithme Gibbs :
+On implémente un algorithme de Gibbs :
 
 ```{r}
 gibbs1 = function(nchain){
@@ -44,17 +44,19 @@ gibbs1 = function(nchain){
     for (j in 1:N_hospitals){
       pi[j] = rbeta(1, n_death[j]+1, n_ops[j] - n_death[j] +1)
     }
-    #store new states
+    #stocker les valeurs de la chaine
     chain[i+1,] = pi 
   }
   return(chain)
 }
 ```
 
+On peut afficher nos chaînes de Markov avec les densités associées :
+
 ```{r}
 chain = gibbs1(11000)
 
-#brunin
+#burn in period
 chain = chain[1001:11001,]
 plot(mcmc(chain))
 ```
@@ -63,15 +65,21 @@ plot(mcmc(chain))
 plot(chain[,2], xlab="", ylab="", col="blue", type="l")
 ```
 
+Ainsi que les autocorrélations pour chaque paramètres :
+
 ```{r}
-acf(chain[,2], main="")
+for (i in 1:12) {
+  acf(chain[,i], main=paste0("p[",i,"]"))
+}
 ```
+
+Enfin, on peut avoir les estimations des moyennes et écart-types de nos paramètres :
 
 ```{r}
 res = data.frame(
   mean = round(apply(chain, 2, mean), 4),
   sd = round(apply(chain, 2, sd), 4)
 )
-rownames(res) = paste("p[", 1:12,"]")
+rownames(res) = paste0("p[", 1:12,"]")
 print(res)
 ```

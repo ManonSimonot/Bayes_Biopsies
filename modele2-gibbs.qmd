@@ -71,7 +71,6 @@ rank_proba = function(b, mu, tau){
   ranks = rank(prob_failure)
   
   return(ranks)
-  
 }
 ```
 
@@ -148,6 +147,8 @@ res_gibbs = gibbs2(nchain, n_ops, n_death, N_hospitals, alpha, beta, sigma_mu, p
 chain = res_gibbs$chain
 ```
 
+On peut afficher nos chaînes de Markov avec les densités associées :
+
 ```{r}
 #burn in period
 chain = chain[1001:11000,]
@@ -161,7 +162,10 @@ plot(chain[,"b2"], type='l', xlab="", ylab="", col="blue")
 ```
 
 ```{r}
-acf(chain[,"b2"], main="")
+for (i in 1:12) {
+  acf(chain[,paste0("b",i)], main=paste0("b[",i,"]"))
+}
+
 ```
 
 Ensuite on retrouve les paramètres $\mu$, $p_i$, $pop.mean$ et $\sigma$ :
@@ -171,6 +175,8 @@ $p_i = \displaystyle \frac{e^{b_i}}{1+ e^{b_i}}$
 $pop.mean = \displaystyle \frac{e^{\mu}}{1+ e^{\mu}}$
 
 $\sigma = \displaystyle \frac{1}{\sqrt{\tau}}$
+
+Et on affiche donc les moyennes et écart-types estimés de nos paramètres :
 
 ```{r}
 b = chain[,1:12]
