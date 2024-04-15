@@ -192,7 +192,9 @@ params = cbind(mu, p, pop.mean, sigma)
 
 res = data.frame(
   mean = round(apply(params, 2, mean), 4),
-  sd = round(apply(params, 2, sd), 4)
+  sd = round(apply(params, 2, sd), 4),
+  q2.5 = apply(params, 2, function(x) quantile(x,probs=0.025)),
+  q97.5 = apply(params, 2, function(x) quantile(x,probs=0.975))
 )
 rownames(res) = c("mu", paste("p[", 1:12,"]", sep=""), "pop.mean", "sigma")
 print(res, max=NULL)

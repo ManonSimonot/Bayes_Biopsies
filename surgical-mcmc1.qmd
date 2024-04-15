@@ -78,7 +78,9 @@ Enfin, on peut avoir les estimations des moyennes et écart-types de nos paramè
 ```{r}
 res = data.frame(
   mean = round(apply(chain, 2, mean), 4),
-  sd = round(apply(chain, 2, sd), 4)
+  sd = round(apply(chain, 2, sd), 4),
+  q2.5 = apply(chain, 2, function(x) quantile(x,probs=0.025)),
+  q97.5 = apply(chain, 2, function(x) quantile(x,probs=0.975))
 )
 rownames(res) = paste0("p[", 1:12,"]")
 print(res)
